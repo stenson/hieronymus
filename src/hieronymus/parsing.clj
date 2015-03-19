@@ -3,6 +3,7 @@
             [clojure.walk :as walk]
             [clj-time.core :as t]
             [clj-time.coerce :as tc]
+            [clj-yaml.core :as yaml]
             [hiccup.core :as h]))
 
 (defn take-to-first [pred coll]
@@ -61,16 +62,20 @@
     {:pre (string/replace p #"^π:" "")}
     ;(re-find "^Q:")
     ;(re-find "^A:")
+    (re-find #"___" p)
+    {:line true}
     (re-find #"^>.*" p)
     {:quotation (string/replace p #"^>[\s]+" "")}
-    (re-find #"^-.*" p)
-    {:bullet (string/replace p #"^-[\s]+" "")}
+    (re-find #"^[-*].*" p)
+    {:bullet (string/replace p #"^(-|\*)[\s]+" "")}
     (re-find #"^[0-9]+\." p)
     {:number p}
     (re-find #"^\|\>" p)
     {:aside-right (string/replace p #"^\|\>[\s]+" "")}
     (re-find #"^\<\|" p)
     {:aside-left (string/replace p #"^\<\|[\s]+" "")}
+    (re-find #"^\<" p)
+    {:inline-html p}
     (re-find #"^\+\+\+" p)
     {:separator "~~~"}
     (re-find #"^\[\^(.*)\]:(.*)" p)
@@ -91,6 +96,11 @@
 (defn- query-cache [url]
   (str url "?c=" (rand-int 100000000)))
 
+(defn- soundcloud-url [id]
+  (format
+    "https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/%s&amp;color=928e8e&amp;auto_play=false&amp;hide_related=false&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false"
+    id))
+
 (def ^:private inline-expansions
   [[:bold
     #"[*_]{2}([^\*_]+)[*_]{2}" #(vec [:strong.inlined (nth % 1)])]
@@ -109,7 +119,11 @@
         :iframe [:iframe.embed {:src (query-cache file)}]
         :audio [:audio {:src (query-cache file)
                         :preload "auto"
-                        :controls "true"}]))]])
+                        :controls "true"}]
+        :soundcloud [:iframe.embed.soundcloud
+                     {:width "100%" :height "166"
+                      :scrolling "no" :frameborder "no"
+                      :src (soundcloud-url file)}]))]])
 
 (defn- expand-all-inlines [text]
   (reduce
@@ -181,11 +195,11 @@
                               (into {}))]
     (walk/postwalk
       (fn [el]
-        (if (not (string? el))
+        (if (or (not (string? el)) (re-matches #"^<(.*)>$" el))
           el
           (-> el
               (maybe-newyorkerize-emdashes config)
-              (escape-html-chars)
+              ;(escape-html-chars)
               (hydrate-link links colors)
               (expand-all-inlines)
               (linkify-footnotes feet-index-pairs)
@@ -203,8 +217,10 @@
     :number
     (let [[_ number text] (re-find #"^([0-9]+)\.(.*)" content)]
       [:li.number style [:span.punct number] text])
+    :line [:hr]
     :aside-right [:div.aside.aside-right style [:div.aside-inner content]]
     :aside-left [:div.aside.aside-left style [:div.aside-inner content]]
+    :inline-html [:div.inline-html style content]
     :separator [:div.separator style content]
     :footnote [:div.footnote
                (assoc style :id (:tag content))
@@ -276,9 +292,11 @@
         [[:div.section (nth (first els) 1) inner] (count inner)]))))
 
 (defn- add-end-mark [config html]
-  (let [last (last html)]
-    (concat (drop-last 1 html)
-            [(conj last [:span.tombstone (:tombstone config "•")])])))
+  (if-let [tombstone (:tombstone config)]
+    (let [last (last html)]
+      (concat (drop-last 1 html)
+              [(conj last [:span.tombstone tombstone])]))
+    html))
 
 (defn- group-by-text-function [tagged]
   (reduce
@@ -292,8 +310,19 @@
     {}
     tagged))
 
+(defn- extract-preamble [str]
+  (let [pieces (string/split str #"\n---")]
+    (if (> (count pieces) 1)
+      [(yaml/parse-string (first pieces))
+       (string/join #"\n---" (rest pieces))]
+      [{} str])))
+
+(defn- hiccup->html [lines]
+  (h/html lines))
+
 (defn str->data-structure [str config]
-  (let [grouped (->> (string/split str #"\n")
+  (let [[preamble raw-text] (extract-preamble str)
+        grouped (->> (string/split raw-text #"\n")
                      (reconstitute-fenced-blocks)
                      (remove #(= "" %))
                      (map tagged-and-edited)
@@ -312,14 +341,17 @@
                   (group-bullets-to-lists)
                   (group-numbers-to-ols)
                   (group-elements-by-section)
-                  (h/html)
+                  (hiccup->html)
                   (annotate-parentheticals)
                   (add-drop-cap))
         html-footnotes (->> (enrich-text footnotes config links nil)
                             (map data->hiccup)
                             (h/html))
-        result (apply merge (map :metadata (:metadata grouped)))]
+        result (apply merge
+                      ; TODO merge preamble here?
+                      (map :metadata (:metadata grouped)))]
     (merge result {:html html
+                   :metadata preamble
                    :footnotes (if (> (count footnotes) 0)
                                 html-footnotes)})))
 
