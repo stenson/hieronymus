@@ -54,7 +54,7 @@
 
 (defn- tagged-and-edited [p]
   (cond
-    (re-find #"^~" p)
+    (re-find #"^([\s]+)?~" p)
     {:metadata (line->metadatum p)}
     (re-find #"^ƒ" p)
     {:figure (string/replace p #"^ƒ" "")}
@@ -112,14 +112,17 @@
    [:inline-link
     #"\[([^\]]+)\]\(([^\)]+)\)" #(vec [:a {:href (nth % 2)} (nth % 1)])]
    [:embed
-    #"«([^:]+):([^»]+)»"
-    (fn [[_ type file]]
+    #"«([^:]+):([^»:]+):?([^»]+)?»"
+    (fn [[_ type file title]]
       (case (keyword type)
         :img [:img {:src (query-cache file)}]
         :iframe [:iframe.embed {:src (query-cache file)}]
-        :audio [:audio {:src (query-cache file)
-                        :preload "auto"
-                        :controls "true"}]
+        :audio [:span.audio-span
+                [:span.sep-title title]
+                [:audio {:src (query-cache file)
+                         :preload "auto"
+                         :controls "true"
+                         :title title}]]
         :soundcloud [:iframe.embed.soundcloud
                      {:width "100%" :height "166"
                       :scrolling "no" :frameborder "no"
@@ -322,7 +325,11 @@
 
 (defn str->data-structure [str config]
   (let [[preamble raw-text] (extract-preamble str)
-        grouped (->> (string/split raw-text #"\n")
+        cleaned-text (-> raw-text
+                         (string/replace #"^[^~]" "")
+                         (string/replace #"\r" ""))
+        grouped (->> (string/split cleaned-text #"\n")
+                     ;(filter (re-matches #"[\w]+" %))
                      (reconstitute-fenced-blocks)
                      (remove #(= "" %))
                      (map tagged-and-edited)
