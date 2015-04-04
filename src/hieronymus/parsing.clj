@@ -110,19 +110,23 @@
     #"([|]{1,})([^|]+)[|]{1,}"
     #(vec [:span.alt {:class (str "alt-" (count (nth % 1)))} (nth % 2)])]
    [:inline-link
-    #"\[([^\]]+)\]\(([^\)]+)\)" #(vec [:a {:href (nth % 2)} (nth % 1)])]
+    #"\[([^\]]+)\]\(([^\)]+)\)"
+    (fn [[_ text href]]
+      (if (re-matches #".*.mp3$|.*.m4a$" href)
+        [:span.audio-span
+         [:span.sep-title text]
+         [:audio {:src (query-cache href)
+                  :preload "auto"
+                  :controls "true"
+                  :title text}]]
+        [:a {:href href} text]))]
    [:embed
-    #"«([^:]+):([^»:]+):?([^»]+)?»"
-    (fn [[_ type file title]]
+    #"«([^:]+):([^»]+)»"
+    (fn [[_ type file]]
       (case (keyword type)
         :img [:img {:src (query-cache file)}]
         :iframe [:iframe.embed {:src (query-cache file)}]
-        :audio [:span.audio-span
-                [:span.sep-title title]
-                [:audio {:src (query-cache file)
-                         :preload "auto"
-                         :controls "true"
-                         :title title}]]
+        :audio [:strong {:style "color:red"} "YOCHANGETHIS"]
         :soundcloud [:iframe.embed.soundcloud
                      {:width "100%" :height "166"
                       :scrolling "no" :frameborder "no"
