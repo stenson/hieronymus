@@ -109,6 +109,9 @@
    [:alternate
     #"([|]{1,})([^|]+)[|]{1,}"
     #(vec [:span.alt {:class (str "alt-" (count (nth % 1)))} (nth % 2)])]
+   [:code-snippet
+    #"`([^`]+)`"
+    #(vec [:span.code (nth % 1)])]
    [:inline-link
     #"\[([^\]]+)\]\(([^\)]+)\)"
     (fn [[_ text href]]
