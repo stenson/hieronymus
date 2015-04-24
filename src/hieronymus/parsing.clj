@@ -122,7 +122,7 @@
                   :preload "auto"
                   :controls "true"
                   :title text}]]
-        [:a {:href href} text]))]
+        [:a {:href href :target "_blank"} text]))]
    [:embed
     #"«([^:]+):([^»]+)»"
     (fn [[_ type file]]
