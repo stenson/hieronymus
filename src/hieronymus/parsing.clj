@@ -251,7 +251,6 @@
       text)))
 
 (defn- hydrate-table-html [style table]
-  (clojure.pprint/pprint table)
   (let [styler (:styler table)
         col-fn (fn [tag idx col]
                  [tag {:align (nth styler idx)} col])
