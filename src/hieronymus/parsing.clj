@@ -146,7 +146,7 @@
     #"`([^`]+)`"
     #(vec [:span.code (nth % 1)])]
    [:inline-link
-    #".*{1,}\[([^\]]+)\]\(([^\)]+)\)"
+    #"\[([^\]]+)\]\(([^\)]+)\)"
     (fn [[_ text href]]
       (if (re-matches #".*.mp3$|.*.m4a$" href)
         [:span.audio-span
