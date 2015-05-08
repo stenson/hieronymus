@@ -23,6 +23,17 @@
         (cons joined (reconstitute-fenced-blocks rest)))
       (cons (first lines) (reconstitute-fenced-blocks (rest lines))))))
 
+(def ^:private t-re #"^\|.*")
+
+(defn- reconstitute-tables [lines]
+  (if-let [fst (first lines)]
+    (if (re-matches t-re fst)
+      (let [block (vec (take-while #(re-matches t-re %) lines))
+            rest (drop (count block) lines)
+            joined (str "†:" (string/join "\n" block))]
+        (cons joined (reconstitute-tables rest)))
+      (cons (first lines) (reconstitute-tables (rest lines))))))
+
 (defn- str->month [str]
   (let [months ["January" "February" "March" "April" "May"
                 "June" "July" "August" "September" "October"
@@ -39,6 +50,24 @@
         date (t/date-time year month day)]
     {:string date-str :date date :unix (tc/to-long date)
      :month-name month-name :year year :month month :day day}))
+
+(defn- expand-table [table]
+  (let [lines (->> (string/split table #"\n")
+                   (map #(string/replace % #"^\||\|$" ""))
+                   (map #(string/split % #"\|"))
+                   (walk/postwalk #(if (string? %) (string/trim %) %)))
+        header (first lines)
+        styler (->> (second lines)
+                    (map (fn [col]
+                           (let [fore (re-find #"^:" col)
+                                 aft (re-find #":$" col)]
+                             (cond
+                               (and fore aft) :center
+                               fore :left
+                               aft :right)))))]
+    {:header header
+     :styler styler
+     :content (drop 2 lines)}))
 
 (defn- line->metadatum [line]
   (let [[key & raw-value] (string/split (string/replace line #"^~" "") #":")
@@ -60,6 +89,8 @@
     {:figure (string/replace p #"^ƒ" "")}
     (re-find #"^π:" p)
     {:pre (string/replace p #"^π:" "")}
+    (re-find #"^†:" p)
+    {:table (expand-table (string/replace p #"^†:" ""))}
     ;(re-find "^Q:")
     ;(re-find "^A:")
     (re-find #"___" p)
@@ -74,6 +105,8 @@
     {:aside-right (string/replace p #"^\|\>[\s]+" "")}
     (re-find #"^\<\|" p)
     {:aside-left (string/replace p #"^\<\|[\s]+" "")}
+    ;(re-find #"\|" p)
+    ;{:table-item (string/replace)}
     (re-find #"^\<" p)
     {:inline-html p}
     (re-find #"^\+\+\+" p)
@@ -113,7 +146,7 @@
     #"`([^`]+)`"
     #(vec [:span.code (nth % 1)])]
    [:inline-link
-    #"\[([^\]]+)\]\(([^\)]+)\)"
+    #".*{1,}\[([^\]]+)\]\(([^\)]+)\)"
     (fn [[_ text href]]
       (if (re-matches #".*.mp3$|.*.m4a$" href)
         [:span.audio-span
@@ -217,10 +250,32 @@
               )))
       text)))
 
+(defn- hydrate-table-html [style table]
+  (clojure.pprint/pprint table)
+  (let [styler (:styler table)
+        col-fn (fn [tag idx col]
+                 [tag {:align (nth styler idx)} col])
+        header [:thead {} (map-indexed (partial col-fn :th) (:header table))]
+        content (->> (:content table)
+                     (map
+                       (fn [row]
+                         (let [diff (- (count row) (count styler))
+                               cols (drop-last diff row)
+                               call (first (take-last diff row))]
+                           [:tr {:class
+                                 (case call
+                                   "!" "highlight"
+                                   "standard")}
+                            (map-indexed (partial col-fn :td) cols)]))))]
+    [:table
+     style
+     (cons header content)]))
+
 (defn- tag&content->hiccup [tag style content]
   (case tag
     :p [:p.classic style content]
     :pre [:pre style content]
+    :table (hydrate-table-html style content)
     :figure [:figure style content]
     :quotation [:blockquote style content]
     :bullet [:li.bullet style [:span.punct "•"] content]
@@ -338,6 +393,7 @@
         grouped (->> (string/split cleaned-text #"\n")
                      ;(filter (re-matches #"[\w]+" %))
                      (reconstitute-fenced-blocks)
+                     (reconstitute-tables)
                      (remove #(= "" %))
                      (map tagged-and-edited)
                      (group-by-text-function))

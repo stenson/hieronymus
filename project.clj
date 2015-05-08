@@ -1,4 +1,4 @@
-(defproject hieronymus "0.1.1-SNAPSHOT"
+(defproject hieronymus "0.1.2-SNAPSHOT"
   :description "Weird characters"
   :url "http://github.com/stenson/hieronymus"
   :license {:name "Eclipse Public License"
