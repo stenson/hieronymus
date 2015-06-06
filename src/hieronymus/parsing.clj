@@ -168,7 +168,7 @@
                       :scrolling "no" :frameborder "no"
                       :src (soundcloud-url file)}]))]])
 
-(defn- expand-all-inlines [text]
+(defn expand-all-inlines [text]
   (reduce
     (fn [acc [_ find replace]]
       (string/replace
