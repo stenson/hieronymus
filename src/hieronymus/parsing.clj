@@ -338,8 +338,10 @@
   (contiguous-grouper-fn
     li-selector
     (fn [els]
-      (let [inner (take-while #(= li-selector (first %)) els)]
-        [[l-selector {} inner] (count inner)]))))
+      (let [inner (take-while #(= li-selector (first %)) els)
+            [ltag lstyles lbody] (last inner)]
+        [[l-selector lstyles (conj (butlast inner) [ltag {} lbody])]
+         (count inner)]))))
 
 (def ^:private group-bullets-to-lists
   (list-grouper :li.bullet :ul.bullets))
@@ -404,12 +406,13 @@
                        (map-indexed
                          (fn [i f]
                            {:footnote (assoc f :index (+ i 1))})))
-        html (->> (enrich-text (:text grouped) config links footnotes)
-                  (map data->hiccup)
-                  (add-end-mark config)
-                  (group-bullets-to-lists)
-                  (group-numbers-to-ols)
-                  (group-elements-by-section)
+        hicpd (->> (enrich-text (:text grouped) config links footnotes)
+                   (map data->hiccup)
+                   (add-end-mark config)
+                   (group-bullets-to-lists)
+                   (group-numbers-to-ols)
+                   (group-elements-by-section))
+        html (->> hicpd
                   (hiccup->html)
                   (annotate-parentheticals)
                   (add-drop-cap))
