@@ -339,8 +339,9 @@
     li-selector
     (fn [els]
       (let [inner (take-while #(= li-selector (first %)) els)
-            [ltag lstyles lbody] (last inner)]
-        [[l-selector lstyles (conj (butlast inner) [ltag {} lbody])]
+            [ltag lstyles & lbody] (last inner)]
+        [[l-selector lstyles
+          (concat (butlast inner) [[ltag {} lbody]])]
          (count inner)]))))
 
 (def ^:private group-bullets-to-lists
@@ -422,6 +423,7 @@
         result (apply merge
                       ; TODO merge preamble here?
                       (map :metadata (:metadata grouped)))]
+    (clojure.pprint/pprint hicpd)
     (merge result {:html html
                    :metadata preamble
                    :footnotes (if (> (count footnotes) 0)
