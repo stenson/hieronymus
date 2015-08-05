@@ -99,6 +99,9 @@
     {:quotation (string/replace p #"^>[\s]+" "")}
     (re-find #"^[-*].*" p)
     {:bullet (string/replace p #"^(-|\*)[\s]+" "")}
+    (re-find #"^@.*" p)
+    (let [[_ key value] (re-find #"^@\s?([^-]+)->\s?(.*)" p)]
+      {:kv {:key (string/trim key) :value (string/trim value)}})
     (re-find #"^[0-9]+\." p)
     {:number p}
     (re-find #"^\|\>" p)
@@ -278,6 +281,9 @@
     :figure [:figure style content]
     :quotation [:blockquote style content]
     :bullet [:li.bullet style [:span.punct "•"] content]
+    :kv [:tr.options-row {}
+         [:td.option-name {} "« " (:key content) " »"]
+         [:td.option-text {} (:value content)]]
     :number
     (let [[_ number text] (re-find #"^([0-9]+)\.(.*)" content)]
       [:li.number style [:span.punct number] text])
@@ -350,6 +356,9 @@
 (def ^:private group-numbers-to-ols
   (list-grouper :li.number :ol.numbers))
 
+(def ^:private group-kvs-to-option-tables
+  (list-grouper :tr.options-row :table.options))
+
 (def ^:private group-elements-by-section
   (contiguous-grouper-fn
     :div.section-start
@@ -412,6 +421,7 @@
                    (add-end-mark config)
                    (group-bullets-to-lists)
                    (group-numbers-to-ols)
+                   (group-kvs-to-option-tables)
                    (group-elements-by-section))
         html (->> hicpd
                   (hiccup->html)
