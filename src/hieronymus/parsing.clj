@@ -423,7 +423,6 @@
         result (apply merge
                       ; TODO merge preamble here?
                       (map :metadata (:metadata grouped)))]
-    (clojure.pprint/pprint hicpd)
     (merge result {:html html
                    :metadata preamble
                    :footnotes (if (> (count footnotes) 0)
