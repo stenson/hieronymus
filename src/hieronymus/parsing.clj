@@ -367,6 +367,16 @@
         ; pull attributes of section start up to the section itself
         [[:div.section (nth (first els) 1) inner] (count inner)]))))
 
+(defn parse-¶s [hcp]
+  (walk/postwalk
+    (fn [el]
+      (if (and (string? el) (re-find #"¶" el))
+        (->> (string/split el #"¶")
+             (map string/trim)
+             (map (fn [s] [:span.block s]))
+             (interpose [:span.psym " ¶ "]))
+        el)) hcp))
+
 (defn- add-end-mark [config html]
   (if-let [tombstone (:tombstone config)]
     (let [last (last html)]
@@ -422,7 +432,8 @@
                    (group-bullets-to-lists)
                    (group-numbers-to-ols)
                    (group-kvs-to-option-tables)
-                   (group-elements-by-section))
+                   (group-elements-by-section)
+                   (parse-¶s))
         html (->> hicpd
                   (hiccup->html)
                   (annotate-parentheticals)
