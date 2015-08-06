@@ -118,6 +118,10 @@
     (let [parse (re-find #"^\[\^(.*)\]:(.*)" p)]
       {:footnote {:tag (nth parse 1)
                   :text (nth parse 2)}})
+    (re-find #"^∫:" p)
+    {:container-start {:classname (nth (re-find #"^∫:([^\s]+)" p) 1)}}
+    (re-find #"^\/∫" p)
+    {:container-end {:content p}}
     (re-find #"^\{\/.*\}$" p)
     {:section-end {:section (re-find #"[^\{\}/]+" p)}}
     (re-find #"^\{.*\}" p)
@@ -298,6 +302,10 @@
                 {:href (format "#back-%s" (:tag content))}
                 (:index content)]
                (:text content)]
+    :container-end [:div.container-end style]
+    :container-start [:div.container-start
+                      (merge style {:class (:classname content)})
+                      ""]
     :section-end [:div.section-end
                   (merge style {:data-section (:section content)})
                   [:div.spandrel]]
@@ -367,6 +375,13 @@
         ; pull attributes of section start up to the section itself
         [[:div.section (nth (first els) 1) inner] (count inner)]))))
 
+(def ^:private slurp-containers
+  (contiguous-grouper-fn
+    :div.container-start
+    (fn [els]
+      (let [inner (take-to-first #(= :div.container-end (first %)) els)]
+        [[:div.container (nth (first els) 1) (drop 1 inner)] (+ (count inner) 1)]))))
+
 (defn parse-¶s [hcp]
   (walk/postwalk
     (fn [el]
@@ -433,6 +448,7 @@
                    (group-numbers-to-ols)
                    (group-kvs-to-option-tables)
                    (group-elements-by-section)
+                   (slurp-containers)
                    (parse-¶s))
         html (->> hicpd
                   (hiccup->html)
