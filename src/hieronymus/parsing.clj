@@ -380,7 +380,7 @@
     :div.container-start
     (fn [els]
       (let [inner (take-to-first #(= :div.container-end (first %)) els)]
-        [[:div.container (nth (first els) 1) (drop 1 inner)] (+ (count inner) 1)]))))
+        [[:div.container (nth (first els) 1) (drop 1 inner)] (count inner)]))))
 
 (defn parse-¶s [hcp]
   (walk/postwalk
