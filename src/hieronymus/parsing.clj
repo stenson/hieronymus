@@ -380,7 +380,7 @@
     :div.container-start
     (fn [els]
       (let [inner (take-to-first #(= :div.container-end (first %)) els)]
-        [[:div.container (nth (first els) 1) (drop 1 inner)] (count inner)]))))
+        [[:div.container (nth (first els) 1) (butlast (drop 1 inner))] (count inner)]))))
 
 (defn parse-¶s [hcp]
   (walk/postwalk
@@ -460,6 +460,7 @@
         result (apply merge
                       ; TODO merge preamble here?
                       (map :metadata (:metadata grouped)))]
+    (clojure.pprint/pprint hicpd)
     (merge result {:html html
                    :metadata preamble
                    :footnotes (if (> (count footnotes) 0)
