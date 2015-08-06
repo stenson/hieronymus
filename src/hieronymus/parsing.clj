@@ -322,7 +322,7 @@
                     out-content (string/replace content re "")]
                 [(if ann
                    (case key
-                     :class (assoc metadata :class (str "ann-" (last ann)))
+                     :class (assoc metadata :class (str (last ann)))
                      :style (assoc metadata :style (last ann)))
                    metadata)
                  out-content]))
