@@ -93,6 +93,16 @@
     {:table (expand-table (string/replace p #"^†:" ""))}
     ;(re-find "^Q:")
     ;(re-find "^A:")
+    (re-find #"^[\#]+" p)
+    (let [[_ pounds txt] (re-find #"^([\#]+)(.*)$" p)]
+      {:header {:text  (string/trim txt)
+                :tag (case (count pounds)
+                       1 :h1
+                       2 :h2
+                       3 :h3
+                       4 :h4
+                       5 :h5
+                       6 :h6)}})
     (re-find #"___" p)
     {:line true}
     (re-find #"^>.*" p)
@@ -285,6 +295,7 @@
     :figure [:figure style content]
     :quotation [:blockquote style content]
     :bullet [:li.bullet style [:span.punct "•"] content]
+    :header [(:tag content) style (:text content)]
     :kv [:tr.options-row {}
          [:td.option-name {} "« " (:key content) " »"]
          [:td.option-text {} (:value content)]]
