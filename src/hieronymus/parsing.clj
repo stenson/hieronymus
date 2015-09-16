@@ -393,7 +393,7 @@
       (let [inner (take-to-first #(= :div.container-end (first %)) els)]
         [[:div.container (nth (first els) 1) (butlast (drop 1 inner))] (count inner)]))))
 
-(defn parse-¶s [hcp]
+(defn parse-pilcrows [hcp]
   (walk/postwalk
     (fn [el]
       (if (and (string? el) (re-find #"¶" el))
@@ -460,7 +460,7 @@
                    (group-kvs-to-option-tables)
                    (group-elements-by-section)
                    (slurp-containers)
-                   (parse-¶s))
+                   (parse-pilcrows))
         html (->> hicpd
                   (hiccup->html)
                   (annotate-parentheticals)
