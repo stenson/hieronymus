@@ -16,10 +16,10 @@
 
 (defn- reconstitute-fenced-blocks [lines]
   (if-let [fst (first lines)]
-    (if (= "```" fst)
+    (if-let [[_ lang] (re-find #"^```(.*)?" fst)]
       (let [block (vec (take-while #(not= "```" %) (rest lines)))
             rest (drop (+ 2 (count block)) lines)
-            joined (str "π:" (string/join "\n" block))]
+            joined (str "π:" lang ":" (string/join "\n" block))]
         (cons joined (reconstitute-fenced-blocks rest)))
       (cons (first lines) (reconstitute-fenced-blocks (rest lines))))))
 
@@ -88,7 +88,9 @@
     (re-find #"^ƒ" p)
     {:figure (string/replace p #"^ƒ" "")}
     (re-find #"^π:" p)
-    {:pre (string/replace p #"^π:" "")}
+    (let [[_ lang & content] (string/split p #":")
+          output (format "<code>%s</code>" (string/join ":" content))]
+      {:pre output})
     (re-find #"^†:" p)
     {:table (expand-table (string/replace p #"^†:" ""))}
     ;(re-find "^Q:")
@@ -212,14 +214,6 @@
                   \< "lt;"
                   \… "&hellip;"}))
 
-(defn annotate-parentheticals [str]
-  (string/replace
-    str #"\(([^\)]+)\)"
-    (fn [[_ parenthetical]]
-      (h/html [:span.parenthesis {} "("]
-              [:span.parenthetical {} parenthetical]
-              [:span.parenthesis {} ")"]))))
-
 (defn- add-drop-cap [str]
   (string/replace
     str #"∂([A-Z])"
@@ -248,23 +242,46 @@
                  [:sup {} (:index foot)]])
         str))))
 
+(defn walk-strings [func data]
+  (walk/postwalk
+    (fn [el]
+      (let [skip? (or (not (string? el)) (boolean (re-find #"^\<" el)))]
+        (if skip?
+          el
+          (func el))))
+    data))
+
+(defn annotate-parentheticals [str]
+  (string/replace
+    str #"\(([^\)]+)\)"
+    (fn [[_ parenthetical]]
+      (h/html [:span.parenthesis {} "("]
+              [:span.parenthetical {} parenthetical]
+              [:span.parenthesis {} ")"]))))
+
+#_(defn- enrich-text-el [config links colors feet-index-pairs el]
+  (let [skip? (or (not (string? el)) (boolean (re-find #"^\<" el)))]
+    (if skip?
+      el
+      (-> el
+          (maybe-newyorkerize-emdashes config)
+          (hydrate-link links colors)
+          (expand-all-inlines)
+          (linkify-footnotes feet-index-pairs)))))
+
 (defn- enrich-text [text config links footnotes]
   (let [colors (get-in config [:link :colors] {})
         feet-index-pairs (->> (map :footnote footnotes)
                               (map #(vector (:tag %) %))
                               (into {}))]
-    (walk/postwalk
+    (walk-strings
       (fn [el]
-        (if (or (not (string? el)) (re-matches #"^<(.*)>$" el))
-          el
-          (-> el
-              (maybe-newyorkerize-emdashes config)
-              ;(escape-html-chars)
-              (hydrate-link links colors)
-              (expand-all-inlines)
-              (linkify-footnotes feet-index-pairs)
-              ;(annotate-parentheticals)
-              )))
+        (-> el
+            (maybe-newyorkerize-emdashes config)
+            (hydrate-link links colors)
+            (expand-all-inlines)
+            (linkify-footnotes feet-index-pairs)
+            (annotate-parentheticals)))
       text)))
 
 (defn- hydrate-table-html [style table]
@@ -463,7 +480,7 @@
                    (parse-pilcrows))
         html (->> hicpd
                   (hiccup->html)
-                  (annotate-parentheticals)
+                  ;(annotate-parentheticals)
                   (add-drop-cap))
         html-footnotes (->> (enrich-text footnotes config links nil)
                             (map data->hiccup)
