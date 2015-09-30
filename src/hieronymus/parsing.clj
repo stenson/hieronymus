@@ -4,7 +4,8 @@
             [clj-time.core :as t]
             [clj-time.coerce :as tc]
             [clj-yaml.core :as yaml]
-            [hiccup.core :as h]))
+            [hiccup.core :as h]
+            [clojure.java.shell :refer [sh]]))
 
 (defn take-to-first [pred coll]
   (if (seq coll)
@@ -88,8 +89,9 @@
     (re-find #"^ƒ" p)
     {:figure (string/replace p #"^ƒ" "")}
     (re-find #"^π:" p)
-    (let [[_ lang & content] (string/split p #":")
-          output (format "<code>%s</code>" (string/join ":" content))]
+    (let [[_ lang & contents] (string/split p #":")
+          content (string/join ":" contents)
+          output (format "<code class=\"%s\">%s</code>" lang content)]
       {:pre output})
     (re-find #"^†:" p)
     {:table (expand-table (string/replace p #"^†:" ""))}
@@ -254,10 +256,12 @@
 (defn annotate-parentheticals [str]
   (string/replace
     str #"\(([^\)]+)\)"
-    (fn [[_ parenthetical]]
-      (h/html [:span.parenthesis {} "("]
-              [:span.parenthetical {} parenthetical]
-              [:span.parenthesis {} ")"]))))
+    (fn [[match parenthetical]]
+      (if (boolean (re-find #"^[§ß]\:" parenthetical))
+        match
+        (h/html [:span.parenthesis {} "("]
+                [:span.parenthetical {} parenthetical]
+                [:span.parenthesis {} ")"])))))
 
 #_(defn- enrich-text-el [config links colors feet-index-pairs el]
   (let [skip? (or (not (string? el)) (boolean (re-find #"^\<" el)))]

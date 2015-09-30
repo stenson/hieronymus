@@ -1,0 +1,9 @@
+ Ok, back to the (plugin) name. (§:huge)
+
+```clojure
+(def freq-slider? nil)
+(count (filter freq-slider? all-params))
+19
+```
+
+From there, it’s just one click to this.
