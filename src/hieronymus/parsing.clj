@@ -7,6 +7,9 @@
             [hiccup.core :as h]
             [clojure.java.shell :refer [sh]]))
 
+(def footnote-order
+  ["*" "†" "‡" "§" "‖" "¶" "☞" "※"])
+
 (defn take-to-first [pred coll]
   (if (seq coll)
     (map last
@@ -165,7 +168,7 @@
     #(vec [:span.alt {:class (str "alt-" (count (nth % 1)))} (nth % 2)])]
    [:code-snippet
     #"`([^`]+)`"
-    #(vec [:span.code (nth % 1)])]
+    #(vec [:span.code.donthyphenate (nth % 1)])]
    [:inline-link
     #"\[([^\]]+)\]\(([^\)]+)\)"
     (fn [[_ text href]]
@@ -310,7 +313,7 @@
 
 (defn- tag&content->hiccup [tag style content]
   (case tag
-    :p [:p.classic style content]
+    :p [:p.classic.hyphenate style content]
     :pre [:pre style content]
     :table (hydrate-table-html style content)
     :figure [:figure style content]
@@ -328,7 +331,7 @@
     :aside-left [:div.aside.aside-left style [:div.aside-inner content]]
     :inline-html [:div.inline-html style content]
     :separator [:div.separator style content]
-    :footnote [:div.footnote
+    :footnote [:div.footnote.hyphenate
                (assoc style :id (:tag content))
                [:a.footnote-backref
                 {:href (format "#back-%s" (:tag content))}
@@ -472,7 +475,7 @@
                        (map :footnote)
                        (map-indexed
                          (fn [i f]
-                           {:footnote (assoc f :index (+ i 1))})))
+                           {:footnote (assoc f :index (nth footnote-order i))})))
         hicpd (->> (enrich-text (:text grouped) config links footnotes)
                    (map data->hiccup)
                    (add-end-mark config)
@@ -499,3 +502,6 @@
 
 (defn text->data-structure [file config]
   (str->data-structure (slurp file) config))
+
+(defn- test-file [file-slug]
+  (:html (str->data-structure (slurp (format "test/%s.txt" file-slug)) {})))
