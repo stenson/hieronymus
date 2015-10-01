@@ -133,8 +133,8 @@
     {:separator "~~~"}
     (re-find #"^\[\^(.*)\]:(.*)" p)
     (let [parse (re-find #"^\[\^(.*)\]:(.*)" p)]
-      {:footnote {:tag (nth parse 1)
-                  :text (nth parse 2)}})
+      {:footnote {:tag  (string/trim (nth parse 1))
+                  :text (string/trim (nth parse 2))}})
     (re-find #"^∫:" p)
     {:container-start {:classname (nth (re-find #"^∫:([^\s]+)" p) 1)}}
     (re-find #"^\/∫" p)
@@ -456,26 +456,42 @@
 (defn- hiccup->html [lines]
   (h/html lines))
 
+(defn extract-footnote-order [text]
+  (let [feet-order (atom [])]
+    (walk-strings
+      (fn [s]
+        (let [feet (re-seq #"\[\^([^\]]+)\]" s)]
+          (reset! feet-order (concat @feet-order (vec (map second feet))))
+          s))
+      text)
+    (flatten @feet-order)))
+
+(defn text->groups [text]
+  (let [cleaned (-> text
+                    (string/replace #"^[^~]" "")
+                    (string/replace #"\r" ""))]
+    (->> (string/split cleaned #"\n")
+         (reconstitute-fenced-blocks)
+         (reconstitute-tables)
+         (remove #(= "" %))
+         (map tagged-and-edited)
+         (group-by-text-function))))
+
+(defn correct-footnotes [{:keys [text footnotes]}]
+  (let [order (extract-footnote-order text)]
+    (->> (map :footnote footnotes)
+         (map (fn [{:keys [tag] :as f}]
+                (let [i (.indexOf order tag)]
+                  {:footnote
+                   (assoc f :index (nth footnote-order i))}))))))
+
 (defn str->data-structure [str config]
   (let [[preamble raw-text] (extract-preamble str)
-        cleaned-text (-> raw-text
-                         (string/replace #"^[^~]" "")
-                         (string/replace #"\r" ""))
-        grouped (->> (string/split cleaned-text #"\n")
-                     ;(filter (re-matches #"[\w]+" %))
-                     (reconstitute-fenced-blocks)
-                     (reconstitute-tables)
-                     (remove #(= "" %))
-                     (map tagged-and-edited)
-                     (group-by-text-function))
+        grouped (text->groups raw-text)
         links (->> (map :link (:links grouped))
                    (map #(vec [(:tag %) (:href %)]))
                    (into {}))
-        footnotes (->> (:footnotes grouped)
-                       (map :footnote)
-                       (map-indexed
-                         (fn [i f]
-                           {:footnote (assoc f :index (nth footnote-order i))})))
+        footnotes (correct-footnotes grouped)
         hicpd (->> (enrich-text (:text grouped) config links footnotes)
                    (map data->hiccup)
                    (add-end-mark config)
