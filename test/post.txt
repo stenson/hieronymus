@@ -1,0 +1,189 @@
+
+∂As of this writing, Goodhertz has two employees. Neither of us are great at mental math (splitting a lunch bill is sometimes difficult), but one of us _is_ good at high level math. By which I mean the big league calculations: mathematical modeling, calculus, algorithms. When everything is going well, this kind of math will heat up your computer just a little. (At other times, in our lab, it heats up our computers a lot.) One of us writes the math that turns ordinary sounds into Goodhertz sounds.
+
+I’m the other guy. But don’t worry! The code I write is math-free. Mostly. I write code that transforms data into interfaces and boilerplate. That is, I write code that makes it _easier to build more plugins_. Too often in audio software, true novelty gets buried in the mundane details of making software: work closer to filling out forms than scribbling inspired equations on a blackboard. At Goodhertz, we want to eliminate the former and encourage the latter.
+
+{thesis:Thesis statement}
+
+We want cut the shortest path from sonic novelty in our lab to sonic novelty in your music.
+
+{/thesis}
+
+O.K., let’s build a plugin. Let’s call it... __Beovulf__.[^naming] Let’s say it’s got... one slider. And one mode switch. Very simple. (To be clear, I don’t really know how other plugin companies build their plugins. But I have a feeling it’s not a lot like this.)
+
+Fire up `pb`, our in-house plugin-building tool, on `localhost:5001`.
+Enter a new catalog number, i.e. `0019`, and hit enter.
+Now you’ve got a whole new directory, `plugins/GHZ0019`, in which sit, among a number of other files, three very important ones: `GHZ0019DSP.h`, `GHZ0019DSP.mm`, and `config.yml`.
+
+The first two — `.h` & `.mm` — are mostly empty now, though they will soon be full of Goodhertz algorithms. Which is Devin’s purview. To me, the files are a black box. Thousands of floating-point digits stream into the black box every few milliseconds; thousands more, modified, stream back out. Numbers in, numbers out. _Simple_ — although only if you think about those two files as a black box.[^bb]
+
+But _how_ do the thousands of numbers get to the black box, _where_ do those numbers come from, and how do the black boxes know _what_ you want them to do? That’s the next step, (4): Fill out `config.yml`.[^yml]
+
+```json
+variables:
+  THEME_COLOR: "SlateGray"
+metadata:
+  beta: true
+  catalog: "0019"
+  pluginName: "Beovulf"
+  color: THEME_COLOR
+  interfaceLayout: |
+    0
+    1
+  height: 200
+clumps:
+  - metadata:
+      name: "Saturation"
+      label: "SAT"
+    parameters:
+      - name: "Saturation Amount"
+        label: "Amount"
+        initialValue: 50
+        substituteStringsForValues: { "0.0": "Off" }
+        color: [saturate, THEME_COLOR, 10]
+        horizontal: true
+  - metadata:
+      name: "English"
+      label: "ENG"
+    parameters:
+      - name: "English Mode"
+        unit: "Indexed"
+        stringValues: ["Old", "Middle", "Modern"]
+        color: [desaturate, THEME_COLOR, 10]
+```
+
+From there, it’s just (step 5) one click to this:
+
+ƒ«img:/img/config/beovulf.png» (ß:max-width:500px) (§:shadowless)
+
+As far as `pb` is concerned, that little bit of configuration _is precisely equivalent_ to that fully-operational interface.
+
+Of course, that interface can’t be gleaned from _just_ those bits of data. Take `English Mode` for example, the second parameter. Given what’s specified in that config, `pb` infers the rest, which ends us being a lot:
+
+```clojure
+(param-keyed (get-config :catalog 19) "EnglishMode")
+&nbsp;
+=> {:automatesSmoothly true, :maxValue 2.0, :clumpName "English", :horizontal true, :aaxRealPrecision 1, :showsScalar false,
+:enumIdentifier "GHZ0019Param_EnglishMode", :frame [0 0 338 85], :color "#7D8083", :controlFocusShape "Default",
+:parameterType "Discrete", :unit "Indexed", :controlStyle "Pilled", :name "English Mode", :hasStringValues true,
+:clump 2, :codesafeName "EnglishMode", :steps 3, :labelString "English Mode", :layoutKey "0", :presetWildcard false,
+:controlScale 1.0, :scope "self", :formatString "%1.0f", :stringValues ("Old" "Middle" "Modern"), :labelDisplay "below",
+:internalValueMapping false, :hostLabel "English Mode",:auLogarithmic false, :pid 2, :granularity 1.0, :controlType "Itemized",
+:coarseGranularity 1.0, :hidden false, :initialValue 0.0, :minimalName "em", :hasUnitSymbol false, :interactionCurve "Linear",
+:cueSymbolDisplay :below, :border [0 0 0 0], :hostClump "English", :fineGranularity 1.0, :logarithmic false, :indexInClump 0,
+:minValue 0.0, :includeCrementers true}
+```
+
+Lots of that will be inscrutable to people who aren’t Goodhertz employees, but some of it may make some intuitive sense. For instance, Pro Tools wants to know if a parameter is `"Continuous"` or `"Discrete"`. Since English Mode is `"Indexed"`, we infer that it’s `"Discrete"`. We infer that it should be displayed as an `"Itemized"` control, which is Goodhertz-speak for a control that can be cycled-through (with little arrows), but can also display a dropdown menu for quick-picking. But that doesn’t mean it couldn’t be some other control. A quick edit — `controlType: "Slider"` — gets us something very different (and not quite as usable):
+
+ƒ«img:/img/config/beovulf-alt.png» (ß:max-width:500px) (§:shadowless)
+
+This leads to an interesting conclusion: Goodhertz interfaces are data (not code). Which means a lot of things, but here’re a few big ones.
+
+{plugins:More plugins}
+
+####(1) Plugins Built on Data are Easier to Build
+
+All this data doesn’t just lead to interfaces, it also solves the most cumbersome part of any plugin development process: _boilerplate_. Most often, plugins are built in such a way that they contain _a lot_ of code, and _a lot_ of assets (15 different images of shadows on metal), which results in _a lot_ of MB’s that you, as a customer, have to download.[^dls]
+
+Goodhertz plugins attempt to be as small as possible, in lots of ways. We keep the CPU footprint small by endlessly optimizing our DSP. We keep the code footprint small by doing as much precompilation as we possibly can — that’s the boilerplate, “unrolled” grist for the C compiler. We also keep the interfaces “small” in the sense that they are composed of only a few primitive components, which makes them easier to understand, both for us (the designers) and for you (the music-makers). Easy to build, simple to use. Powerful at both points.
+
+All in all, we built this system because we wanted to make building plugins easier, and because we believe that the most difficult work we do here at Goodhertz — the work that requires the most intellectual effort and consumes the most time — should be (1) writing DSP, (2) explaining that DSP, and (3) improving our user interfaces. Everything else is just bureaucracy; `pb` is our red-tape-cutting machine.
+
+(You may have noticed that, as a two person company, we released 12 plugins before our first anniversary.)
+
+{/plugins}
+
+&nbsp;
+
+{formats:More formats}
+
+####(2) Plugins Built on Data are Easier to Port
+
+When you start with data, programming languages and platforms matter a lot less. We already sell plugins in the Mac AU and AAX formats, but iOS and Mac framework versions of our plugins are only one click away.[^l]
+
+But what about more plugin formats? For the last couple of months, we’ve been asking that question: [what plugin format do you wish we supported](https://goodhertz.co/format-request)? Hundreds of you have been answering, and in the near future we’ll be asking for your help to make those formats happen. Windows people, that means you. And iOS people.
+
+{/formats}
+
+&nbsp;
+
+{improve:More features}
+
+####(3) Plugins Built on Data are Easier to Improve
+
+Goodhertz plugins all share a single interface. They might look different, but the interface code in [Trem Control](https://goodhertz.co/trem-ctrl) and [Tone Control](https://goodhertz.co/tone-ctrl) is exactly the same. As a result, when we fix a bug in one, we fix a bug in all of them, and we make those fixes available all at once. _All_ of our plugins are constantly improving; none are gathering dust on the shelf.
+
+{/improve}
+
+&nbsp;
+
+{db:More questions}
+
+####(4) Plugins Built on Data are a Database of Plugins
+
+Because we start from data and expand to more data, we can treat our plugins like a database.
+
+Let’s start up a [Clojure](http://clojure.org) REPL[^clj] try out that last assertion. First things first, we need to gather up all the parameters in all the plugins.
+
+```clojure
+(def all-params (apply concat (map :parameters (get-release-configs []))))
+=> #'pb.core/all-params
+```
+
+Now we can ask questions, like: _how many parameters are there in all the public Goodhertz plugins?_
+
+```clojure
+(count all-params)
+=> 191
+```
+
+Or, _how many of those parameters are sliders that control frequency?_
+
+```clojure
+(defn freq-slider? [p]
+   (and (= "Hertz" (:unit p))
+        (= "Slider" (:controlType p)))
+&nbsp;
+(count (filter freq-slider? all-params))
+=> 19
+```
+
+That last one may seem contrived, but knowing concrete facts about our interfaces enables us to think about them on the whole, and leads us to more informed decisions.
+
+For instance, should we spend more time perfecting the mechanics of frequency sliders when we only have 19 of them (out of a total of 191 controls)? Doesn’t quite seem worth it. But what if we sort the plugins by number of frequency controls?
+
+```clojure
+(->> (get-release-configs [])
+      (map (fn [{:keys [metadata parameters]}]
+             [(:pluginName metadata)
+              (:catalog metadata)
+              (count (filter freq-slider? parameters))]))
+      (sort-by #(nth % 2))
+      (reverse))
+&nbsp;
+=> (["Midside" :0013 6] ["Tiltshift" :0015 6] ["Lossy" :0005 2] ["Tone Control" :0003 2] ["Faraday Limiter" :0007 1] ["Lohi" :0006 1] ["Trem Control" :0004 1] ["Good Dither" :0012 0] ["Panpot" :0009 0] ["Vulf Compressor" :0002 0] ["CanOpener Studio" :0001 0])
+```
+
+Interesting that our newest plugins — [Midside](https://goodhertz.co/midside) and [Tiltshift](https://goodhertz.co/tiltshift) — both use so many frequency sliders. Given that frequency sliders are on the rise, perfecting them seems like time well spent.
+
+{/db}
+
+Oh you read this whole article? Wild. You want a [job](https://goodhertz.co/jobs)?
+
+
+
+
+
+
+[^clj]: Why a Clojure REPL? Because we use Clojure to build our plugins. Why? Great question, though one I’ll answer more thoroughly in a future blog post. For now, I’ll say simply: when you think about a build process as a single (complex) transformation of data to code, then Clojure makes a ton of sense. And watching videos about Clojure kind of led me to the build process we now have. So, kind of a symbiotic process.
+
+[^yml]: One side-effect of my time working at Twitter: I used to think [YAML](http://yaml.org/) was awesome. I still _kind of_ do, but the complexity of our config specs has quickly outpaced the benefit of such a simple configuration language. We’ll be transitioning our config-editing process to a rich database-style interface in the near future.
+
+[^bb]: Stay tuned for future blog posts in which those are _not_ thought of as black boxes; in which Devin takes an inverse view of the Goodhertz plugin-building process.
+
+[^naming]: Nothing vexes us more than coming up with names for plugins. That’s why we recently started referring to in-development plugins almost exclusively by their catalog numbers, which are assigned as soon as the idea is good enough to commit to code. (For those playing close attention: this partially explains why Midside, our 11th plugin, has catalog number `0013`, but Tiltshift, our 10th plugin, has catalog number `0015`. Devin started work on Midside and accidentally invented a revolutionary tilt EQ, so we thought: _this should probably be its own plugin_. (Between the idea for Midside and idea for Tiltshift, we had another idea, but that plugin is still in development.))
+
+[^l]: If you build a product and you’re looking to license Goodhertz DSP for it, [let us know](https://goodhertz.co/contact). We’d love to talk specifics.
+
+[^dls]: (footnote about hilarious size of UAD or Waves downloads here)

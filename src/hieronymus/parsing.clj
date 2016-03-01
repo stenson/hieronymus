@@ -5,7 +5,8 @@
             [clj-time.coerce :as tc]
             [clj-yaml.core :as yaml]
             [hiccup.core :as h]
-            [clojure.java.shell :refer [sh]]))
+            [clojure.java.shell :refer [sh]]
+            [puget.printer :as puget]))
 
 (def footnote-order
   ["*" "†" "‡" "§" "‖" "¶" "☞" "※"])
@@ -160,18 +161,18 @@
 
 (def ^:private inline-expansions
   [[:bold
-    #"[*_]{2}([^\*_]+)[*_]{2}" #(vec [:strong.inlined (nth % 1)])]
+    #"[*_]{2}([^\*_]+)[*_]{2}" #(vec [:strong.inlined (nth % 0)])]
    [:italic
-    #"[*_]{1}([^\*_\)]+)[*_]{1}" #(vec [:em.inlined (nth % 1)])]
+    #"[*_]{1}([^\*_\)]+)[*_]{1}" #(vec [:em.inlined (nth % 0)])]
    [:alternate
     #"([|]{1,})([^|]+)[|]{1,}"
-    #(vec [:span.alt {:class (str "alt-" (count (nth % 1)))} (nth % 2)])]
+    #(vec [:span.alt {:class (str "alt-" (count (nth % 0)))} (nth % 1)])]
    [:code-snippet
     #"`([^`]+)`"
-    #(vec [:span.code.donthyphenate (nth % 1)])]
+    #(vec [:span.code.donthyphenate (nth % 0)])]
    [:inline-link
     #"\[([^\]]+)\]\(([^\)]+)\)"
-    (fn [[_ text href]]
+    (fn [[text href]]
       (if (re-matches #".*.mp3$|.*.m4a$" href)
         [:span.audio-span
          [:span.sep-title text]
@@ -182,7 +183,7 @@
         [:a {:href href :target "_blank"} text]))]
    [:embed
     #"«([^:]+):([^»]+)»"
-    (fn [[_ type file]]
+    (fn [[type file]]
       (case (keyword type)
         :img [:img {:src (query-cache file)}]
         :iframe [:iframe.embed {:src (query-cache file)}]
@@ -192,15 +193,18 @@
                       :scrolling "no" :frameborder "no"
                       :src (soundcloud-url file)}]))]])
 
+; look for URLs and url-enocode them?
+
 (defn expand-all-inlines [text]
-  (reduce
-    (fn [acc [_ find replace]]
-      (string/replace
-        acc find
-        (fn [& args]
-          (h/html (apply replace args)))))
-    text
-    inline-expansions))
+  (-> (reduce
+         (fn [acc [_ find replace]]
+           (string/replace
+             acc (re-pattern (format "([\\n\\s])%s" find))
+             (fn [args]
+               (str (nth args 1) (h/html (replace (drop 2 args)))))))
+         (str "\n" text)
+         inline-expansions)
+       (string/replace #"^\n" "")))
 
 (defn- maybe-newyorkerize-emdashes [str config]
   (if (:newyorkerize config)
@@ -288,7 +292,8 @@
             (hydrate-link links colors)
             (expand-all-inlines)
             (linkify-footnotes feet-index-pairs)
-            (annotate-parentheticals)))
+            ;(annotate-parentheticals)
+            ))
       text)))
 
 (defn- hydrate-table-html [style table]
@@ -481,9 +486,11 @@
   (let [order (extract-footnote-order text)]
     (->> (map :footnote footnotes)
          (map (fn [{:keys [tag] :as f}]
-                (let [i (.indexOf order tag)]
-                  {:footnote
-                   (assoc f :index (nth footnote-order i))}))))))
+                (assoc f :i (.indexOf order tag))))
+         (filter :i)
+         (sort-by :i)
+         (map (fn [{:keys [i] :as f}]
+                {:footnote (assoc f :index (str (+ i 1)))})))))
 
 (defn str->data-structure [str config]
   (let [[preamble raw-text] (extract-preamble str)
