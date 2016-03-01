@@ -5,8 +5,7 @@
             [clj-time.coerce :as tc]
             [clj-yaml.core :as yaml]
             [hiccup.core :as h]
-            [clojure.java.shell :refer [sh]]
-            [puget.printer :as puget]))
+            [clojure.java.shell :refer [sh]]))
 
 (def footnote-order
   ["*" "†" "‡" "§" "‖" "¶" "☞" "※"])

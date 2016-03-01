@@ -1,4 +1,4 @@
-(defproject hieronymus "0.2.2-SNAPSHOT"
+(defproject hieronymus "0.2.4-SNAPSHOT"
   :description "Weird characters"
   :url "http://github.com/stenson/hieronymus"
   :license {:name "Eclipse Public License"
@@ -8,5 +8,4 @@
                  [clj-time "0.8.0"]
                  [com.rpl/specter "0.7.1"]
                  [circleci/clj-yaml "0.5.3"]]
-  :profiles {:dev {:dependencies [[hiccup-bridge "1.0.1"]
-                                  [mvxcvi/puget "0.8.1"]]}})
+  :profiles {:dev {:dependencies [[hiccup-bridge "1.0.1"]]}})
